@@ -1,0 +1,111 @@
+
+#mycal-tasks-panel .mycal-task-items {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+}
+
+#mycal-tasks-panel .mycal-task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid #edf0ed;
+  font-size: 12px;
+}
+
+#mycal-tasks-panel .mycal-task-info {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#mycal-tasks-panel .mycal-task-info strong {
+  display: block;
+  color: #263d34;
+}
+
+#mycal-tasks-panel .mycal-task-info span {
+  display: block;
+  margin-top: 4px;
+  color: #6d7b73;
+  font-size: 11px;
+}
+
+#mycal-tasks-panel .is-complete strong {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+#mycal-tasks-panel .mycal-task-item button {
+  border: none;
+  background: transparent;
+  color: #21664f;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px;
+}
+
+#mycal-tasks-panel .mycal-task-empty {
+  font-size: 12px;
+  color: #6d7b73;
+  padding: 10px 0;
+}
+
+#mycal-tasks-panel #mycal-task-form {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f7faf8;
+  border: 1px solid #e2e9e3;
+  border-radius: 9px;
+}
+
+#mycal-tasks-panel #mycal-task-form[hidden],
+#mycal-tasks-panel [hidden] {
+  display: none !important;
+}
+
+#mycal-tasks-panel label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #263d34;
+}
+
+#mycal-tasks-panel input:not([type="checkbox"]),
+#mycal-tasks-panel select {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  padding: 8px;
+  margin-top: 5px;
+  border: 1px solid #d6e2da;
+  border-radius: 6px;
+  background: white;
+  font-size: 12px;
+}
+
+#mycal-tasks-panel .mycal-task-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+#mycal-tasks-panel .mycal-task-form-actions button {
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#mycal-task-submit {
+  background: #21664f;
+  color: white;
+}
+
+#mycal-task-cancel {
+  background: #e6f1e9;
+  color: #21664f;
+}
