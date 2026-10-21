@@ -1,0 +1,10 @@
+/* MyCal individual reminder controls */
+.mycal-reminder-field { border-top: 1px solid #e2e9e3; padding-top: 14px; }
+.mycal-reminder-toggle { display:flex; align-items:center; gap:8px; margin:10px 0; font-size:12px; cursor:pointer; }
+.mycal-reminder-toggle input { accent-color:var(--mycal-accent, #21664f); }
+#mycalReminderOptions { margin-top:10px; }
+#mycalReminderOptions select, #mycalReminderCustom input { box-sizing:border-box; width:100%; padding:9px; border:1px solid #d6e2da; border-radius:7px; background:#fff; font:inherit; }
+#mycalReminderCustom { margin-top:10px; }
+#mycalReminderCustom label { display:block; margin-bottom:5px; font-size:12px; }
+.mycal-reminder-hint { margin:8px 0 0; color:#6d7b73; font-size:11px; line-height:1.4; }
+#mycalReminderOptions[hidden], #mycalReminderCustom[hidden] { display:none !important; }
