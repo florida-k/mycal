@@ -1,5 +1,8 @@
-// MyCal Spring Boot assignment metadata bridge (existing functionality)
-const API_BASE = "http://localhost:8080/api/assignments";
+// MyCal Spring Boot assignment metadata bridge
+// Temporary mock user for development/testing only.
+// Authentication will eventually determine the user automatically.
+const MOCK_USER_ID = 1;
+const API_BASE = `http://localhost:8080/api/users/${MOCK_USER_ID}/assignments`;
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const type = message?.type;
