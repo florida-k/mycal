@@ -9,5 +9,9 @@ public interface AssignmentMetadataRepository
         extends JpaRepository<AssignmentMetadata, Long> {
 
     Optional<AssignmentMetadata>
-        findByCourseIdAndAssignmentId(String courseId, String assignmentId);
+        findByUser_IdAndCourseIdAndAssignmentId(
+                Long userId,
+                String courseId,
+                String assignmentId
+        );
 }

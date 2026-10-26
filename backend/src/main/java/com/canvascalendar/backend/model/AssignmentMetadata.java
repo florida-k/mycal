@@ -3,17 +3,16 @@ package com.canvascalendar.backend.model;
 import jakarta.persistence.*;
 
 @Entity
-@Table(
-    name = "assignment_metadata",
-    uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"course_id", "assignment_id"})
-    }
-)
+@Table(name = "assignment_metadata")
 public class AssignmentMetadata {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     @Column(name = "course_id", nullable = false)
     private String courseId;
@@ -28,22 +27,7 @@ public class AssignmentMetadata {
 
     private String notes;
 
-    // Required by JPA/Hibernate
     public AssignmentMetadata() {
-    }
-
-    public AssignmentMetadata(
-            String courseId,
-            String assignmentId,
-            String priority,
-            Integer estimatedMinutes,
-            String notes) {
-
-        this.courseId = courseId;
-        this.assignmentId = assignmentId;
-        this.priority = priority;
-        this.estimatedMinutes = estimatedMinutes;
-        this.notes = notes;
     }
 
     public Long getId() {
@@ -52,6 +36,14 @@ public class AssignmentMetadata {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
     }
 
     public String getCourseId() {
