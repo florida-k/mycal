@@ -3,6 +3,25 @@
   if (window.__mycalSidebarLoaded) return;
   window.__mycalSidebarLoaded = true;
   const API = '/api/v1/courses?enrollment_state=active&per_page=100';
+  async function getCanvasUserId() {
+  const response = await fetch('/api/v1/users/self', {
+    credentials: 'same-origin',
+    cache: 'no-store'
+  });
+
+  if (!response.ok) {
+    throw new Error('Unable to identify Canvas user');
+  }
+
+  const user = await response.json();
+  const userId = String(user.id);
+
+  if (!/^\d+$/.test(userId)) {
+    throw new Error('Invalid Canvas user ID');
+  }
+
+  return userId;
+}
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const minutes = (metadata) => {
     if (Number.isFinite(Number(metadata?.estimatedMinutes)) && metadata?.estimatedMinutes !== undefined && metadata?.estimatedMinutes !== null) return Math.max(0, Number(metadata.estimatedMinutes));
@@ -57,13 +76,48 @@
     panel.querySelector('#mycal-toggle-workload')?.addEventListener('click',e=>{const list=panel.querySelector('#mycal-upcoming-list');const opened=list.classList.toggle('is-open');e.currentTarget.setAttribute('aria-expanded',String(opened));e.currentTarget.textContent=opened?'Hide upcoming assignments ↑':'View upcoming assignments ↓';});
     nativeCalendars(root);
   }
-  async function refresh() {
-    const root=sidebar();if(!root)return;
-    try {
-      const [assignments,saved]=await Promise.all([fetchAssignments(),storage()]);
-      render(assignments.map(a=>{const m=saved[`powerTool_${a.course_id}_${a.id}`]||null;return {...a,mycalMetadata:m,mycalMinutes:minutes(m)};}),root);
-    } catch(e) {console.warn('MyCal sidebar summary:',e);}
+let refreshVersion = 0;
+
+async function refresh() {
+  const root = sidebar();
+  if (!root) return;
+
+  const version = ++refreshVersion;
+
+  // Remove previously displayed planning data during identity verification.
+  document.getElementById('mycal-sidebar-panel')?.remove();
+
+  try {
+    const canvasUserId = await getCanvasUserId();
+
+    const [assignments, saved] = await Promise.all([
+      fetchAssignments(),
+      storage()
+    ]);
+
+    if (version !== refreshVersion) return;
+
+    const confirmedUserId = await getCanvasUserId();
+
+    if (version !== refreshVersion || confirmedUserId !== canvasUserId) {
+      return;
+    }
+
+    render(assignments.map(a => {
+      const key = `powerTool_${canvasUserId}_${a.course_id}_${a.id}`;
+      const m = saved[key] || null;
+
+      return {
+        ...a,
+        mycalMetadata: m,
+        mycalMinutes: minutes(m)
+      };
+    }), root);
+
+  } catch (e) {
+    console.warn('MyCal sidebar summary:', e);
   }
+}
   let attempts=0;
   const boot=setInterval(()=>{if(sidebar()){clearInterval(boot);refresh();}else if(++attempts>=20)clearInterval(boot);},500);
   chrome.storage.onChanged.addListener((changes,area)=>{if(area==='local' && Object.keys(changes).some(k=>k.startsWith('powerTool_'))) refresh();});

@@ -2,12 +2,21 @@
   "manifest_version": 3,
   "name": "MyCal",
   "version": "1.3",
-  "description": "Personal planning tools integrated with Canvas Calendar.",
+  "description": "Assignment planning tools integrated with Canvas Calendar.",
   "permissions": ["storage", "alarms", "notifications"],
   "content_scripts": [{
     "matches": ["https://ufl.instructure.com/*"],
-    "js": ["content.js", "mycal-sidebar.js", "mycal-tasks.js", "mycal-theme.js"],
-    "css": ["mycal-sidebar.css", "mycal-editor.css", "mycal-tasks.css", "mycal-theme.css", "mycal-reminders.css"]
+    "js": [
+      "content.js",
+      "mycal-sidebar.js",
+      "mycal-theme.js"
+    ],
+    "css": [
+      "mycal-sidebar.css",
+      "mycal-editor.css",
+      "mycal-theme.css",
+      "mycal-reminders.css"
+    ]
   }],
   "host_permissions": ["http://localhost:8080/*"],
   "background": { "service_worker": "background.js" }

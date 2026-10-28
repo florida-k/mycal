@@ -78,3 +78,21 @@
 .fc-day-grid-event.assignment .mycal-priority-dot[data-priority="medium"] { background: #e6a52d; }
 .fc-day-grid-event.assignment .mycal-priority-dot[data-priority="high"] { background: #df514d; }
 .fc-day-grid-event.assignment .power-tool-badge { background: transparent; color: inherit; opacity: .95; padding-left: 0; }
+
+/* Week 9: let crowded month-view weeks show all assignments.
+   Do not alter FullCalendar's icon/title inline layout or MyCal's
+   existing two-line priority/effort badge styling. */
+.fc-month-view .fc-day-grid-container,
+.fc-month-view .fc-day-grid-container.fc-scroller {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+.fc-month-view .fc-day-grid .fc-row {
+  height: auto !important;
+  min-height: 110px;
+  overflow: visible !important;
+}
+.fc-month-view .fc-day-grid .fc-content-skeleton {
+  overflow: visible !important;
+}

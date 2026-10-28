@@ -1,8 +1,6 @@
 console.log("Canvas Calendar Power Tool loaded!");
 
-
-
-
+// Canvas user identity is retrieved by getCanvasUserId() below.
 
 // --------------------------------------------------
 
@@ -12,12 +10,11 @@ console.log("Canvas Calendar Power Tool loaded!");
 
 
 
-function getStorageKey(assignment) {
+async function getStorageKey(assignment) {
+  const canvasUserId = await getCanvasUserId();
 
-  return `powerTool_${assignment.course_id}_${assignment.id}`;
-
+  return `powerTool_${canvasUserId}_${assignment.course_id}_${assignment.id}`;
 }
-
 
 
 
@@ -25,100 +22,12 @@ function getStorageKey(assignment) {
 
 
 async function getSavedMetadata(assignment) {
-
-  const key = getStorageKey(assignment);
-
-
-
-  try {
-
-    const response = await chrome.runtime.sendMessage({
-
-      type: "MYCAL_GET_METADATA",
-
-      courseId: String(assignment.course_id),
-
-      assignmentId: String(assignment.id)
-
-    });
-
-
-
-    if (response?.ok && response.data) {
-
-      const backendData = response.data;
-
-
-
-      // Convert Spring Boot's format into the format
-
-      // your existing MyCal editor expects.
-
-      const metadata = {
-
-        priority: backendData.priority?.toLowerCase() || null,
-
-        estimatedTime: backendData.estimatedMinutes != null
-
-          ? formatEstimatedTime(backendData.estimatedMinutes)
-
-          : null,
-
-        notes: backendData.notes || ""
-
-      };
-
-
-
-      // Keep Chrome storage synchronized with PostgreSQL.
-
-      await chrome.storage.local.set({
-
-        [key]: metadata
-
-      });
-
-
-
-      return metadata;
-
-    }
-
-
-
-    if (response?.ok && response.data === null) {
-
-      // No database record yet. Preserve older local plans.
-
-      const local = await chrome.storage.local.get(key);
-
-      return local[key] || null;
-
-    }
-
-
-
-    console.warn("MyCal backend loading failed:", response?.error);
-
-
-
-  } catch (error) {
-
-    console.warn("MyCal backend unavailable:", error.message);
-
-  }
-
-
-
-  // Fallback if Spring Boot is offline.
-
+  // Local storage is the source of truth until backend authentication is implemented.
+  // Do not read the shared MOCK_USER_ID backend: that could overwrite this user's plan.
+  const key = await getStorageKey(assignment);
   const local = await chrome.storage.local.get(key);
-
   return local[key] || null;
-
 }
-
-
 
 // Convert minutes from PostgreSQL to MyCal's display format.
 
@@ -152,7 +61,7 @@ function formatEstimatedTime(minutes) {
 
 async function saveMetadata(assignment, metadata) {
 
-  const key = getStorageKey(assignment);
+  const key = await getStorageKey(assignment);
 
 
 
@@ -579,7 +488,6 @@ function openPowerToolEditor(event, assignment, metadata = {}) {
   const reminderMode = editor.querySelector("#mycalReminderMode");
   const reminderCustom = editor.querySelector("#mycalReminderCustom");
   const reminderDateTime = editor.querySelector("#mycalReminderDateTime");
-  const reminderStorageKey = `mycal_reminder_${assignment.course_id}_${assignment.id}`;
 
   reminderEnabled.addEventListener("change", () => {
     reminderOptions.hidden = !reminderEnabled.checked;
@@ -589,10 +497,19 @@ function openPowerToolEditor(event, assignment, metadata = {}) {
   });
 
   // Avoid overwriting an existing reminder before it finishes loading.
+  // Avoid overwriting an existing reminder before it finishes loading.
   saveButton.disabled = true;
-  chrome.storage.local.get(reminderStorageKey).then(result => {
+
+  getCanvasUserId().then(canvasUserId => {
+    const reminderStorageKey =
+      `mycal_reminder_${canvasUserId}_${assignment.course_id}_${assignment.id}`;
+
+    return chrome.storage.local.get(reminderStorageKey)
+      .then(result => result[reminderStorageKey]);
+
+  }).then(saved => {
     if (!editor.isConnected) return;
-    const saved = result[reminderStorageKey];
+
     if (saved?.enabled) {
       reminderEnabled.checked = true;
       reminderMode.value = saved.mode || "morning";
@@ -703,59 +620,33 @@ function openPowerToolEditor(event, assignment, metadata = {}) {
 
     try {
 
+    // Schedule or clear this assignment's individual reminder.
+    const canvasUserId = await getCanvasUserId();
 
-      // Schedule or clear this assignment's individual reminder.
-      const reminderResponse = await chrome.runtime.sendMessage({
-        type: "MYCAL_SAVE_REMINDER",
-        reminder: {
-          courseId: String(assignment.course_id),
-          assignmentId: String(assignment.id),
-          title: assignment.name || "Canvas assignment",
-          dueAt: assignment.due_at || null,
-          enabled: reminderEnabled.checked,
-          mode: reminderMode.value,
-          customAt: reminderDateTime.value || null
-        }
-      });
-      if (!reminderResponse?.ok) {
-        throw new Error(reminderResponse?.error || "Could not schedule reminder.");
+    const reminderResponse = await chrome.runtime.sendMessage({
+      type: "MYCAL_SAVE_REMINDER",
+      reminder: {
+        canvasUserId,
+        courseId: String(assignment.course_id),
+        assignmentId: String(assignment.id),
+        title: assignment.name || "Canvas assignment",
+        dueAt: assignment.due_at || null,
+        enabled: reminderEnabled.checked,
+        mode: reminderMode.value,
+        customAt: reminderDateTime.value || null
       }
+    });
+
+    if (!reminderResponse?.ok) {
+      throw new Error(reminderResponse?.error || "Could not schedule reminder.");
+  }
 
       // Preserve the existing local fallback while syncing to Spring Boot.
 
       await saveMetadata(assignment, newMetadata);
 
-      try {
-
-        const result = await chrome.runtime.sendMessage({
-
-          type: "MYCAL_SAVE_METADATA",
-
-          courseId: String(assignment.course_id),
-
-          assignmentId: String(assignment.id),
-
-          metadata: {
-
-            priority: selectedPriority.toUpperCase(),
-
-            estimatedMinutes,
-
-            notes: newMetadata.notes || null
-
-          }
-
-        });
-
-        if (!result?.ok) console.warn("MyCal backend unavailable; saved locally:", result?.error);
-
-      } catch (error) {
-
-        console.warn("MyCal backend unavailable; saved locally:", error);
-
-      }
-
-
+      // Backend syncing is intentionally paused until requests are authenticated.
+      // The Spring Boot REST endpoints remain available for isolated mock-user testing.
 
       // Mutate the same object captured by the calendar badge/editor handlers.
 
@@ -911,10 +802,28 @@ function matchCanvasAssignment(event, assignments) {
 
 
 
+async function getCanvasUserId() {
+  const response = await fetch("/api/v1/users/self", {
+    credentials: "same-origin",
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to identify the current Canvas user.");
+  }
+
+  const user = await response.json();
+  const userId = String(user.id);
+
+  if (!/^\d+$/.test(userId)) {
+    throw new Error("Invalid Canvas user ID.");
+  }
+
+  return userId;
+}
+
 let cachedAssignments = null;
-
 let calendarEnhancementRunning = false;
-
 let calendarRefreshTimer = null;
 
 
@@ -944,6 +853,8 @@ async function enhanceCalendar() {
       if (!content) continue;
 
       event.dataset.mycalEnhanced = "true";
+
+      event.title = assignment.name || event.title || "Canvas assignment";
 
       const metadata = (await getSavedMetadata(assignment)) || {};
 
