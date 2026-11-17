@@ -5,13 +5,13 @@ import com.canvascalendar.backend.model.User;
 import com.canvascalendar.backend.repository.AssignmentMetadataRepository;
 import com.canvascalendar.backend.repository.UserRepository;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
-@RequestMapping("/api/users/{userId}/assignments")
+@RequestMapping("/api/assignments")
 public class AssignmentMetadataController {
 
     private final AssignmentMetadataRepository repository;
@@ -20,7 +20,6 @@ public class AssignmentMetadataController {
     public AssignmentMetadataController(
             AssignmentMetadataRepository repository,
             UserRepository userRepository) {
-
         this.repository = repository;
         this.userRepository = userRepository;
     }
@@ -53,20 +52,29 @@ public class AssignmentMetadataController {
         );
     }
 
+    private User getOrCreateUser(Jwt jwt) {
+        String supabaseUserId = jwt.getSubject();
+
+        return userRepository.findBySupabaseUserId(supabaseUserId)
+                .orElseGet(() -> {
+                    User user = new User("supabase_" + supabaseUserId);
+                    user.setSupabaseUserId(supabaseUserId);
+                    return userRepository.save(user);
+                });
+    }
+
     @PutMapping("/{courseId}/{assignmentId}")
     public MetadataResponse updateMetadata(
-            @PathVariable Long userId,
+            @AuthenticationPrincipal Jwt jwt,
             @PathVariable String courseId,
             @PathVariable String assignmentId,
             @RequestBody MetadataRequest request) {
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "User not found"));
+        User user = getOrCreateUser(jwt);
 
         AssignmentMetadata saved = repository
                 .findByUser_IdAndCourseIdAndAssignmentId(
-                        userId, courseId, assignmentId)
+                        user.getId(), courseId, assignmentId)
                 .orElseGet(AssignmentMetadata::new);
 
         saved.setUser(user);
@@ -81,13 +89,15 @@ public class AssignmentMetadataController {
 
     @GetMapping("/{courseId}/{assignmentId}")
     public ResponseEntity<MetadataResponse> getMetadata(
-            @PathVariable Long userId,
+            @AuthenticationPrincipal Jwt jwt,
             @PathVariable String courseId,
             @PathVariable String assignmentId) {
 
+        User user = getOrCreateUser(jwt);
+
         return repository
                 .findByUser_IdAndCourseIdAndAssignmentId(
-                        userId, courseId, assignmentId)
+                        user.getId(), courseId, assignmentId)
                 .map(this::toResponse)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());

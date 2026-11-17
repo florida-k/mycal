@@ -1,17 +1,26 @@
+import "./chrome-auth.bundle.js";
 
-// MyCal Spring Boot assignment metadata bridge
-// Temporary mock user for development/testing only.
-// Authentication will eventually determine the user automatically.
-const MOCK_USER_ID = 1;
-const API_BASE = `http://localhost:8080/api/users/${MOCK_USER_ID}/assignments`;
+// MyCal Spring Boot assignment metadata bridge.
+// The backend identifies the user from the verified Supabase JWT.
+const API_BASE = "http://localhost:8080/api/assignments";
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const type = message?.type;
-  if (type !== "MYCAL_SAVE_METADATA" && type !== "MYCAL_GET_METADATA") return false;
+
+  if (type !== "MYCAL_SAVE_METADATA" && type !== "MYCAL_GET_METADATA") {
+    return false;
+  }
 
   const { courseId, assignmentId } = message;
-  if (!/^\d+$/.test(String(courseId)) || !/^\d+$/.test(String(assignmentId))) {
-    sendResponse({ ok: false, error: "Invalid Canvas assignment identifiers" });
+
+  if (
+    !/^\d+$/.test(String(courseId)) ||
+    !/^\d+$/.test(String(assignmentId))
+  ) {
+    sendResponse({
+      ok: false,
+      error: "Invalid Canvas assignment identifiers"
+    });
     return false;
   }
 
@@ -19,29 +28,48 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   (async () => {
     try {
+      const accessToken = await globalThis.getMyCalAccessToken();
+
       const response = type === "MYCAL_SAVE_METADATA"
         ? await fetch(url, {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${accessToken}`
+            },
             body: JSON.stringify(message.metadata)
           })
-        : await fetch(url, { method: "GET" });
+        : await fetch(url, {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${accessToken}`
+            }
+          });
 
       if (type === "MYCAL_GET_METADATA" && response.status === 404) {
         sendResponse({ ok: true, data: null });
         return;
       }
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      sendResponse({ ok: true, data: await response.json() });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      sendResponse({
+        ok: true,
+        data: await response.json()
+      });
+
     } catch (error) {
-      sendResponse({ ok: false, error: error.message });
+      sendResponse({
+        ok: false,
+        error: error.message
+      });
     }
   })();
 
   return true;
 });
-
 
 // Local individual reminders (no Spring Boot dependency)
 const REMINDER_PREFIX = "mycal_reminder_";

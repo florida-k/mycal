@@ -21,13 +21,51 @@ async function getStorageKey(assignment) {
 
 
 
+
 async function getSavedMetadata(assignment) {
-  // Local storage is the source of truth until backend authentication is implemented.
-  // Do not read the shared MOCK_USER_ID backend: that could overwrite this user's plan.
   const key = await getStorageKey(assignment);
   const local = await chrome.storage.local.get(key);
-  return local[key] || null;
+  const localMetadata = local[key] || null;
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "MYCAL_GET_METADATA",
+      courseId: String(assignment.course_id),
+      assignmentId: String(assignment.id)
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error || "Backend request failed");
+    }
+
+    if (!response.data) {
+      return localMetadata;
+    }
+
+    const backendMetadata = {
+      priority: response.data.priority,
+      estimatedTime: response.data.estimatedMinutes == null
+        ? ""
+        : formatEstimatedTime(response.data.estimatedMinutes),
+      notes: response.data.notes || ""
+    };
+
+    await chrome.storage.local.set({
+      [key]: backendMetadata
+    });
+
+    return backendMetadata;
+
+  } catch (error) {
+    console.warn(
+      "MyCal backend unavailable; using local metadata:",
+      error.message
+    );
+
+    return localMetadata;
+  }
 }
+
 
 // Convert minutes from PostgreSQL to MyCal's display format.
 
@@ -59,31 +97,50 @@ function formatEstimatedTime(minutes) {
 
 
 
-async function saveMetadata(assignment, metadata) {
 
+async function saveMetadata(assignment, metadata) {
   const key = await getStorageKey(assignment);
 
-
-
+  // Keep local storage as a fallback.
   await chrome.storage.local.set({
-
     [key]: metadata
-
   });
 
+  const estimatedTime = String(metadata.estimatedTime || "").trim();
+  let estimatedMinutes = null;
 
+  if (/^\d+m$/.test(estimatedTime)) {
+    estimatedMinutes = parseInt(estimatedTime, 10);
+  } else if (/^\d+h$/.test(estimatedTime)) {
+    estimatedMinutes = parseInt(estimatedTime, 10) * 60;
+  }
 
-  console.log(
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "MYCAL_SAVE_METADATA",
+      courseId: String(assignment.course_id),
+      assignmentId: String(assignment.id),
+      metadata: {
+        priority: metadata.priority,
+        estimatedMinutes,
+        notes: metadata.notes || ""
+      }
+    });
 
-    "Saved Power Tool metadata:",
+    if (!response?.ok) {
+      throw new Error(response?.error || "Backend save failed");
+    }
 
-    key,
+    console.log("Saved MyCal metadata to PostgreSQL:", response.data);
 
-    metadata
-
-  );
-
+  } catch (error) {
+    console.warn(
+      "MyCal backend save failed; metadata saved locally:",
+      error.message
+    );
+  }
 }
+
 
 
 
