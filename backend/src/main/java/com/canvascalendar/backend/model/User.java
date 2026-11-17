@@ -13,6 +13,9 @@ public class User {
     @Column(name = "username", nullable = false, unique = true)
     private String username;
 
+    @Column(name = "supabase_user_id", unique = true)
+    private String supabaseUserId;
+
     public User() {
     }
 
@@ -34,5 +37,13 @@ public class User {
 
     public void setUsername(String username) {
         this.username = username;
+    }
+
+    public String getSupabaseUserId() {
+        return supabaseUserId;
+    }
+
+    public void setSupabaseUserId(String supabaseUserId) {
+        this.supabaseUserId = supabaseUserId;
     }
 }
