@@ -1,4 +1,4 @@
-
+import "./chrome-auth.bundle.js";
 // MyCal Spring Boot assignment metadata bridge
 // Temporary mock user for development/testing only.
 // Authentication will eventually determine the user automatically.
