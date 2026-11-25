@@ -1,0 +1,194 @@
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  width: 320px;
+  margin: 0;
+  background: #ffffff;
+  color: #202b3c;
+  font-family: -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  font-size: 13px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+header img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+
+h1 {
+  margin: 0 0 3px;
+  font-size: 21px;
+  font-weight: 700;
+}
+
+p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+header p {
+  color: #64748b;
+  font-size: 11px;
+}
+
+main {
+  padding: 18px;
+}
+
+.section-label {
+  margin-bottom: 9px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+}
+
+.account-card {
+  padding: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
+
+.account-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.status-dot.connected {
+  background: #16a34a;
+}
+
+#accountDescription,
+#accountEmail {
+  color: #64748b;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+#accountEmail {
+  margin-bottom: 6px;
+}
+
+button {
+  width: 100%;
+  padding: 11px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+
+.primary:hover {
+  background: #f1f5f9;
+}
+
+.secondary {
+  background: transparent;
+  border: none;
+  color: #2563eb;
+  margin-top: 3px;
+}
+
+.secondary:hover {
+  text-decoration: underline;
+}
+
+.calendar-button {
+  margin-top: 12px;
+  background: #2563eb;
+  color: white;
+  border: none;
+}
+
+.calendar-button:hover {
+  background: #1d4ed8;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+#statusMessage {
+  font-size: 11px;
+  color: #475569;
+}
+
+#statusMessage:not(:empty) {
+  margin-top: 10px;
+}
+
+#statusMessage.error {
+  color: #b91c1c;
+}
+
+footer {
+  padding: 12px;
+  border-top: 1px solid #e5e7eb;
+  color: #94a3b8;
+  text-align: center;
+  font-size: 10px;
+}
+
+.signout-button {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  transition: background 0.15s ease;
+}
+
+.signout-button:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+/* Match MyCal's existing green theme */
+.calendar-button {
+  background: #20634f;
+}
+
+.calendar-button:hover {
+  background: #184e3e;
+}
+
+.status-dot.connected {
+  background: #20634f;
+}
+
+.secondary {
+  color: #20634f;
+}

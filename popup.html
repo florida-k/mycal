@@ -1,20 +1,61 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Canvas Calendar Power Tool</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MyCal</title>
+  <link rel="stylesheet" href="popup.css">
 </head>
 
 <body>
-  <h2>Canvas Calendar Power Tool</h2>
+  <header>
+    <img src="icons/icon128.png" alt="MyCal">
+    <div>
+      <h1>MyCal</h1>
+      <p>Your Canvas planning companion</p>
+    </div>
+  </header>
 
-  <p>Extension is running!</p>
+  <main>
+    <div class="section-label">ACCOUNT</div>
 
-  <button id="loadAssignments">
-    Load Assignments
-  </button>
+    <section class="account-card">
+      <div class="account-heading">
+        <span id="statusDot" class="status-dot"></span>
+        <strong id="accountTitle">Loading account...</strong>
+      </div>
 
-  <div id="output"></div>
+      <p id="accountEmail" hidden></p>
+      <p id="accountDescription">
+        Checking your MyCal session.
+      </p>
+    </section>
+
+    <div id="guestActions" hidden>
+      <button id="connectGoogle" class="primary">
+        Connect Google account
+      </button>
+
+      <button id="signInGoogle" class="secondary">
+        Already connected? Sign in
+      </button>
+    </div>
+
+    <div id="connectedActions" hidden>
+      <button id="signOut" class="signout-button">
+        Sign out
+      </button>
+    </div>
+    <p id="statusMessage" role="status" aria-live="polite"></p>
+
+    <button id="openCalendar" class="calendar-button">
+      Open Canvas Calendar
+    </button>
+  </main>
+
+  <footer>
+    MyCal · Your calendar, your way.
+  </footer>
 
   <script src="popup.js"></script>
 </body>

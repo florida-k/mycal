@@ -20943,205 +20943,199 @@ var supabase = createClient(
   }
 );
 
-// test-google-link.js
-async function testGoogleLink() {
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError || !sessionData.session) {
-    console.error("No existing Supabase session.");
-    return;
-  }
-  const originalUserId = sessionData.session.user.id;
-  const redirectTo = chrome.identity.getRedirectURL();
-  console.log("Original Supabase user ID:", originalUserId);
-  const { data, error } = await supabase.auth.linkIdentity({
-    provider: "google",
-    options: {
-      redirectTo,
-      skipBrowserRedirect: true
-    }
-  });
-  if (error) {
-    console.error("Google linking failed:", error.message);
-    return;
-  }
-  if (!data?.url) {
-    console.error("Supabase did not return an OAuth URL.");
-    return;
-  }
-  console.log("Google linking URL generated successfully.");
-  try {
-    const callbackUrl = await chrome.identity.launchWebAuthFlow({
-      url: data.url,
-      interactive: true
-    });
-    if (!callbackUrl) {
-      throw new Error("No OAuth callback URL received.");
-    }
-    const callback = new URL(callbackUrl);
-    const code = callback.searchParams.get("code");
-    if (!code) {
-      throw new Error(
-        callback.searchParams.get("error_description") || "OAuth callback did not contain a code."
-      );
-    }
-    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-    if (exchangeError) {
-      throw exchangeError;
-    }
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError) {
-      throw userError;
-    }
-    console.log("Google identity linking completed!");
-    console.log("User ID after linking:", userData.user.id);
-    console.log(
-      "Same user ID:",
-      userData.user.id === originalUserId
-    );
-    console.log(
-      "Linked providers:",
-      userData.user.identities?.map((identity) => identity.provider)
-    );
-  } catch (error2) {
-    console.error("Google OAuth flow failed:", error2.message);
-  }
-}
-
-// test-google-signin.js
-async function testGoogleSignIn() {
-  const redirectTo = chrome.identity.getRedirectURL();
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo,
-      skipBrowserRedirect: true
-    }
-  });
-  if (error) {
-    console.error("Google sign-in failed:", error.message);
-    return;
-  }
-  if (!data?.url) {
-    console.error("Supabase did not return an OAuth URL.");
-    return;
-  }
-  console.log("Google sign-in URL generated successfully.");
-  try {
-    const callbackUrl = await chrome.identity.launchWebAuthFlow({
-      url: data.url,
-      interactive: true
-    });
-    if (!callbackUrl) {
-      throw new Error("No OAuth callback URL received.");
-    }
-    const callback = new URL(callbackUrl);
-    const code = callback.searchParams.get("code");
-    if (!code) {
-      throw new Error(
-        callback.searchParams.get("error_description") || "OAuth callback did not contain a code."
-      );
-    }
-    const { data: authData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-    if (exchangeError) {
-      throw exchangeError;
-    }
-    console.log("Google sign-in completed!");
-    console.log("Recovered user ID:", authData.user.id);
-    console.log(
-      "Anonymous:",
-      authData.user.is_anonymous
-    );
-    console.log(
-      "Providers:",
-      authData.user.app_metadata?.providers
-    );
-  } catch (error2) {
-    console.error("Google sign-in flow failed:", error2.message);
-  }
-}
-
 // test-chrome-auth.js
-async function testAuth() {
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) {
-    console.error("Session error:", sessionError.message);
-    return;
-  }
-  if (sessionData.session) {
-    console.log("Existing session restored!");
-    console.log("User ID:", sessionData.session.user.id);
-    return;
-  }
-  const { data, error } = await supabase.auth.signInAnonymously();
-  if (error) {
-    console.error("Anonymous sign-in failed:", error.message);
-    return;
-  }
-  console.log("New anonymous session created!");
-  console.log("User ID:", data.user.id);
-}
-testAuth();
-globalThis.testMyCalGoogleSignIn = testGoogleSignIn;
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== "MYCAL_TEST_GOOGLE_LINK") {
-    return false;
-  }
-  testGoogleLink().then(() => sendResponse({ ok: true })).catch(
-    (error) => sendResponse({ ok: false, error: error.message })
-  );
-  return true;
-});
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== "MYCAL_TEST_GOOGLE_SIGNIN") {
-    return false;
-  }
-  testGoogleSignIn().then(() => sendResponse({ ok: true })).catch(
-    (error) => sendResponse({ ok: false, error: error.message })
-  );
-  return true;
-});
-globalThis.testMyCalBackendAuth = async () => {
-  const { data, error } = await supabase.auth.getSession();
-  if (error) {
-    console.error("Supabase session error:", error.message);
-    return;
-  }
-  if (!data.session) {
-    console.error("No active Supabase session found.");
-    return;
-  }
-  const response = await fetch(
-    "http://localhost:8080/api/assignments/542201/6666209",
-    {
-      headers: {
-        Authorization: `Bearer ${data.session.access_token}`
+var initializationPromise = null;
+var oauthInProgress = false;
+async function ensureSession() {
+  if (!initializationPromise) {
+    initializationPromise = (async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        throw error;
       }
-    }
-  );
-  console.log("Backend HTTP status:", response.status);
-  console.log("Backend response:", await response.text());
-};
-globalThis.getMyCalAccessToken = async () => {
-  const { data, error } = await supabase.auth.getSession();
-  if (error) {
-    throw new Error(`Supabase session error: ${error.message}`);
+      if (data.session) {
+        return data.session;
+      }
+      const { data: anonymousData, error: anonymousError } = await supabase.auth.signInAnonymously();
+      if (anonymousError) {
+        throw anonymousError;
+      }
+      if (!anonymousData.session) {
+        throw new Error("Unable to initialize MyCal session.");
+      }
+      return anonymousData.session;
+    })().finally(() => {
+      initializationPromise = null;
+    });
   }
-  if (!data.session?.access_token) {
+  return initializationPromise;
+}
+ensureSession().catch((error) => {
+  console.error("MyCal authentication failed:", error.message);
+});
+async function getAccountStatus() {
+  await ensureSession();
+  const { data, error } = await supabase.auth.getUser();
+  if (error) {
+    throw error;
+  }
+  const user = data.user;
+  if (!user) {
+    throw new Error("No active MyCal account.");
+  }
+  return {
+    anonymous: user.is_anonymous === true,
+    googleConnected: user.identities?.some(
+      (identity) => identity.provider === "google"
+    ) ?? false,
+    email: user.email || null
+  };
+}
+async function authenticateGoogle(mode) {
+  if (oauthInProgress) {
+    throw new Error("Google authentication is already in progress.");
+  }
+  oauthInProgress = true;
+  try {
+    const session = await ensureSession();
+    const originalUserId = session.user.id;
+    const redirectTo = chrome.identity.getRedirectURL();
+    const options = {
+      redirectTo,
+      skipBrowserRedirect: true
+    };
+    const result = mode === "link" ? await supabase.auth.linkIdentity({
+      provider: "google",
+      options
+    }) : await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options
+    });
+    if (result.error) {
+      throw result.error;
+    }
+    if (!result.data?.url) {
+      throw new Error("Unable to start Google authentication.");
+    }
+    const callbackUrl = await chrome.identity.launchWebAuthFlow({
+      url: result.data.url,
+      interactive: true
+    });
+    if (!callbackUrl) {
+      throw new Error("Google authentication was cancelled.");
+    }
+    const callback = new URL(callbackUrl);
+    const code = callback.searchParams.get("code");
+    const callbackError = callback.searchParams.get("error_description") || callback.searchParams.get("error");
+    if (callbackError) {
+      throw new Error(callbackError);
+    }
+    if (!code) {
+      throw new Error("Google authentication returned no code.");
+    }
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) {
+      throw error;
+    }
+    if (!data.user) {
+      throw new Error("Google authentication returned no user.");
+    }
+    if (mode === "link" && data.user.id !== originalUserId) {
+      throw new Error(
+        "Account linking returned an unexpected user identity."
+      );
+    }
+    return await getAccountStatus();
+  } finally {
+    oauthInProgress = false;
+  }
+}
+async function refreshCanvasTabs() {
+  try {
+    const tabs = await chrome.tabs.query({
+      url: "https://ufl.instructure.com/calendar*"
+    });
+    await Promise.allSettled(
+      tabs.filter((tab) => tab.id !== void 0).map((tab) => chrome.tabs.reload(tab.id))
+    );
+  } catch (error) {
+    console.warn("Unable to refresh Canvas tabs:", error.message);
+  }
+}
+async function signOutMyCal() {
+  if (oauthInProgress) {
+    throw new Error("Account authentication is already in progress.");
+  }
+  oauthInProgress = true;
+  try {
+    await ensureSession();
+    const { error } = await supabase.auth.signOut({
+      scope: "local"
+    });
+    if (error) {
+      throw error;
+    }
+    await ensureSession();
+    const account = await getAccountStatus();
+    await refreshCanvasTabs();
+    return account;
+  } finally {
+    oauthInProgress = false;
+  }
+}
+chrome.runtime.onMessage.addListener(
+  (message, sender, sendResponse) => {
+    const type = message?.type;
+    const supportedTypes = [
+      "MYCAL_AUTH_STATUS",
+      "MYCAL_AUTH_LINK_GOOGLE",
+      "MYCAL_AUTH_SIGNIN_GOOGLE",
+      "MYCAL_AUTH_SIGNOUT"
+    ];
+    if (!supportedTypes.includes(type)) {
+      return false;
+    }
+    if (sender.url !== chrome.runtime.getURL("popup.html")) {
+      sendResponse({
+        ok: false,
+        error: "Unauthorized authentication request."
+      });
+      return false;
+    }
+    (async () => {
+      try {
+        let data;
+        if (type === "MYCAL_AUTH_STATUS") {
+          data = await getAccountStatus();
+        } else if (type === "MYCAL_AUTH_LINK_GOOGLE") {
+          data = await authenticateGoogle("link");
+          await refreshCanvasTabs();
+        } else if (type === "MYCAL_AUTH_SIGNIN_GOOGLE") {
+          data = await authenticateGoogle("signin");
+          await refreshCanvasTabs();
+        } else if (type === "MYCAL_AUTH_SIGNOUT") {
+          data = await signOutMyCal();
+        }
+        sendResponse({ ok: true, data });
+      } catch (error) {
+        sendResponse({
+          ok: false,
+          error: error.message
+        });
+      }
+    })();
+    return true;
+  }
+);
+globalThis.getMyCalAccessToken = async () => {
+  if (oauthInProgress) {
+    throw new Error(
+      "Account authentication in progress. Please try again."
+    );
+  }
+  const session = await ensureSession();
+  if (!session?.access_token) {
     throw new Error("No active Supabase session found.");
   }
-  return data.session.access_token;
-};
-globalThis.createMyCalTestUser = async () => {
-  const { error: signOutError } = await supabase.auth.signOut({
-    scope: "local"
-  });
-  if (signOutError) {
-    throw new Error(signOutError.message);
-  }
-  const { data, error } = await supabase.auth.signInAnonymously();
-  if (error) {
-    throw new Error(error.message);
-  }
-  console.log("New test Supabase user ID:", data.user.id);
-  return data.user.id;
+  return session.access_token;
 };
