@@ -31,7 +31,7 @@
   };
   const fmt = n => `${Math.floor(n / 60)}h${n % 60 ? ` ${n % 60}m` : ''}`;
   const sidebar = () => document.querySelector('#right-side') || document.querySelector('.right-side');
-  const storage = async () => chrome.storage.local.get(null);
+
   async function fetchAssignments() {
     const res = await fetch(API, {credentials:'include'});
     if (!res.ok) throw new Error('Canvas courses unavailable');
@@ -90,37 +90,46 @@ async function refresh() {
   try {
     const canvasUserId = await getCanvasUserId();
 
-    const [assignments, saved] = await Promise.all([
-      fetchAssignments(),
-      storage()
-    ]);
-
-    if (version !== refreshVersion) return;
-
-    const confirmedUserId = await getCanvasUserId();
-
-    if (version !== refreshVersion || confirmedUserId !== canvasUserId) {
-      return;
+    const assignments = await fetchAssignments();
+    const future = assignments.filter(a => a.due_at && new Date(a.due_at).getTime() >= Date.now());
+    const items = [];
+    // Limit concurrent requests while retaining the existing later-planned summary.
+    for (let i = 0; i < future.length; i += 6) {
+      if (version !== refreshVersion) return;
+      const batch = await Promise.all(future.slice(i, i + 6).map(async a => {
+        const response = await chrome.runtime.sendMessage({
+          type: 'MYCAL_GET_METADATA', courseId: String(a.course_id), assignmentId: String(a.id)
+        });
+        if (!response?.ok) throw new Error(response?.error || 'Backend unavailable');
+        const m = response.data || null;
+        return {...a, mycalMetadata: m, mycalMinutes: minutes(m)};
+      }));
+      items.push(...batch);
     }
-
-    render(assignments.map(a => {
-      const key = `powerTool_${canvasUserId}_${a.course_id}_${a.id}`;
-      const m = saved[key] || null;
-
-      return {
-        ...a,
-        mycalMetadata: m,
-        mycalMinutes: minutes(m)
-      };
-    }), root);
+    const confirmedUserId = await getCanvasUserId();
+    if (version !== refreshVersion || confirmedUserId !== canvasUserId) return;
+    render(items, root);
 
   } catch (e) {
     console.warn('MyCal sidebar summary:', e);
+    if (version !== refreshVersion) return;
+    const panel = document.createElement('section');
+    panel.id = 'mycal-sidebar-panel';
+    const card = document.createElement('div');
+    card.className = 'mycal-card';
+    card.textContent = 'Unable to load MyCal workload. Check your connection and try again.';
+    const retry = document.createElement('button');
+    retry.className = 'mycal-action';
+    retry.textContent = 'Retry';
+    retry.addEventListener('click', refresh);
+    card.appendChild(retry);
+    panel.appendChild(card);
+    root.prepend(panel);
   }
 }
   let attempts=0;
   const boot=setInterval(()=>{if(sidebar()){clearInterval(boot);refresh();}else if(++attempts>=20)clearInterval(boot);},500);
-  chrome.storage.onChanged.addListener((changes,area)=>{if(area==='local' && Object.keys(changes).some(k=>k.startsWith('powerTool_'))) refresh();});
+  document.addEventListener('mycal-metadata-saved', refresh);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
 })();
 

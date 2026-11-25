@@ -10,62 +10,20 @@ console.log("Canvas Calendar Power Tool loaded!");
 
 
 
-async function getStorageKey(assignment) {
-  const canvasUserId = await getCanvasUserId();
-
-  return `powerTool_${canvasUserId}_${assignment.course_id}_${assignment.id}`;
-}
-
-
-
-
-
-
-
 async function getSavedMetadata(assignment) {
-  const key = await getStorageKey(assignment);
-  const local = await chrome.storage.local.get(key);
-  const localMetadata = local[key] || null;
-
-  try {
-    const response = await chrome.runtime.sendMessage({
-      type: "MYCAL_GET_METADATA",
-      courseId: String(assignment.course_id),
-      assignmentId: String(assignment.id)
-    });
-
-    if (!response?.ok) {
-      throw new Error(response?.error || "Backend request failed");
-    }
-
-    if (!response.data) {
-      return localMetadata;
-    }
-
-    const backendMetadata = {
-      priority: response.data.priority,
-      estimatedTime: response.data.estimatedMinutes == null
-        ? ""
-        : formatEstimatedTime(response.data.estimatedMinutes),
-      notes: response.data.notes || ""
-    };
-
-    await chrome.storage.local.set({
-      [key]: backendMetadata
-    });
-
-    return backendMetadata;
-
-  } catch (error) {
-    console.warn(
-      "MyCal backend unavailable; using local metadata:",
-      error.message
-    );
-
-    return localMetadata;
-  }
+  const response = await chrome.runtime.sendMessage({
+    type: "MYCAL_GET_METADATA",
+    courseId: String(assignment.course_id),
+    assignmentId: String(assignment.id)
+  });
+  if (!response?.ok) throw new Error(response?.error || "Backend request failed");
+  if (!response.data) return null;
+  return {
+    priority: response.data.priority,
+    estimatedTime: response.data.estimatedMinutes == null ? "" : formatEstimatedTime(response.data.estimatedMinutes),
+    notes: response.data.notes || ""
+  };
 }
-
 
 // Convert minutes from PostgreSQL to MyCal's display format.
 
@@ -99,13 +57,6 @@ function formatEstimatedTime(minutes) {
 
 
 async function saveMetadata(assignment, metadata) {
-  const key = await getStorageKey(assignment);
-
-  // Keep local storage as a fallback.
-  await chrome.storage.local.set({
-    [key]: metadata
-  });
-
   const estimatedTime = String(metadata.estimatedTime || "").trim();
   let estimatedMinutes = null;
 
@@ -115,7 +66,6 @@ async function saveMetadata(assignment, metadata) {
     estimatedMinutes = parseInt(estimatedTime, 10) * 60;
   }
 
-  try {
     const response = await chrome.runtime.sendMessage({
       type: "MYCAL_SAVE_METADATA",
       courseId: String(assignment.course_id),
@@ -133,12 +83,7 @@ async function saveMetadata(assignment, metadata) {
 
     console.log("Saved MyCal metadata to PostgreSQL:", response.data);
 
-  } catch (error) {
-    console.warn(
-      "MyCal backend save failed; metadata saved locally:",
-      error.message
-    );
-  }
+
 }
 
 
@@ -677,6 +622,11 @@ function openPowerToolEditor(event, assignment, metadata = {}) {
 
     try {
 
+      await saveMetadata(assignment, newMetadata);
+      Object.assign(metadata, newMetadata);
+      event.mycalUpdatePlan?.();
+      document.dispatchEvent(new Event("mycal-metadata-saved"));
+      try {
     // Schedule or clear this assignment's individual reminder.
     const canvasUserId = await getCanvasUserId();
 
@@ -698,13 +648,11 @@ function openPowerToolEditor(event, assignment, metadata = {}) {
       throw new Error(reminderResponse?.error || "Could not schedule reminder.");
   }
 
-      // Preserve the existing local fallback while syncing to Spring Boot.
-
-      await saveMetadata(assignment, newMetadata);
-
-      // Backend syncing is intentionally paused until requests are authenticated.
-      // The Spring Boot REST endpoints remain available for isolated mock-user testing.
-
+      } catch (error) {
+        status.textContent = "Assignment saved, but reminder update failed. Please retry.";
+        saveButton.disabled = false;
+        return;
+      }
       // Mutate the same object captured by the calendar badge/editor handlers.
 
       Object.assign(metadata, newMetadata);
@@ -717,7 +665,7 @@ function openPowerToolEditor(event, assignment, metadata = {}) {
 
       console.error("MyCal save failed:", error);
 
-      status.textContent = error.message || "Could not save. Please try again.";
+      status.textContent = "Unable to confirm MyCal save. Please check your connection and try again.";
 
       saveButton.disabled = false;
 
@@ -913,7 +861,25 @@ async function enhanceCalendar() {
 
       event.title = assignment.name || event.title || "Canvas assignment";
 
-      const metadata = (await getSavedMetadata(assignment)) || {};
+      let metadata = {};
+      let loadFailed = false;
+      try {
+        metadata = (await getSavedMetadata(assignment)) || {};
+      } catch (error) {
+        loadFailed = true;
+        console.warn("MyCal metadata unavailable:", error);
+      }
+      async function openFreshEditor() {
+        try {
+          const fresh = (await getSavedMetadata(assignment)) || {};
+          for (const key of Object.keys(metadata)) delete metadata[key];
+          Object.assign(metadata, fresh);
+          event.mycalUpdatePlan?.();
+          openPowerToolEditor(event, assignment, metadata);
+        } catch (error) {
+          alert("Unable to connect to MyCal. Assignment planning data could not be loaded. Please try again.");
+        }
+      }
 
       if (!event.isConnected) continue;
 
@@ -931,7 +897,7 @@ async function enhanceCalendar() {
 
       edit.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L9 17l-4 1 1-4Z"/></svg>`;
 
-      edit.title = "Customize in MyCal";
+      edit.title = loadFailed ? "MyCal connection unavailable — click to retry" : "Customize in MyCal";
 
       edit.setAttribute("aria-label", `Customize ${assignment.name} in MyCal`);
 
@@ -941,7 +907,7 @@ async function enhanceCalendar() {
 
         e.stopPropagation();
 
-        openPowerToolEditor(event, assignment, metadata);
+        void openFreshEditor();
 
       });
 
@@ -1005,7 +971,7 @@ async function enhanceCalendar() {
 
         e.stopPropagation();
 
-        openPowerToolEditor(event, assignment, metadata);
+        void openFreshEditor();
 
       });
 
