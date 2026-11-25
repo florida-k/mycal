@@ -3,7 +3,14 @@ package com.canvascalendar.backend.model;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "assignment_metadata")
+@Table(
+    name = "assignment_metadata",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            columnNames = {"user_id", "course_id", "assignment_id"}
+        )
+    }
+)
 public class AssignmentMetadata {
 
     @Id
