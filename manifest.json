@@ -19,7 +19,7 @@
     ]
   }],
   "host_permissions": [
-    "http://localhost:8080/*",
+    "https://mycal-backend.onrender.com/*",
     "https://xktyfeqvvvmuiutusojo.supabase.co/*"
   ],
    "background": {

@@ -2,7 +2,7 @@ import "./chrome-auth.bundle.js";
 
 // MyCal Spring Boot assignment metadata bridge.
 // The backend identifies the user from the verified Supabase JWT.
-const API_BASE = "http://localhost:8080/api/assignments";
+const API_BASE = "https://mycal-backend.onrender.com/api/assignments";
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const type = message?.type;
